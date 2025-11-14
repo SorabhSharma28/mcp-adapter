@@ -4,8 +4,8 @@ import requests
 from dotenv import load_dotenv
 from flask_cors import CORS
 
-CORS(app)
 load_dotenv()
+CORS(app)
 app = Flask(__name__)
 
 # Set your Salesforce credentials from environment variables
