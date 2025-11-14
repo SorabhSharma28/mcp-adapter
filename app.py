@@ -1,46 +1,61 @@
 import os
-from flask import Flask, request, jsonify
-import requests
-from dotenv import load_dotenv
+import openai
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 
-load_dotenv()
+# Load environment variables (e.g., for API key)
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
 app = Flask(__name__)
 CORS(app)
 
-# Set your Salesforce credentials from environment variables
-SF_CLIENT_ID = os.getenv("SF_CLIENT_ID")
-SF_CLIENT_SECRET = os.getenv("SF_CLIENT_SECRET")
-SF_USERNAME = os.getenv("SF_USERNAME")
-SF_PASSWORD = os.getenv("SF_PASSWORD")
+def get_ai_summary(opportunity):
+    prompt = f"""Summarize this Salesforce Opportunity for sales follow-up priority:
+    Name: {opportunity.get("Name")}
+    Amount: {opportunity.get("Amount")}
+    Stage: {opportunity.get("StageName")}
+    """
+    response = openai.Completion.create(
+        engine="text-davinci-003",
+        prompt=prompt,
+        max_tokens=24
+    )
+    return response.choices[0].text.strip()
 
-def get_salesforce_token():
-    token_url = "https://login.salesforce.com/services/oauth2/token"
-    params = {
-        "grant_type": "password",
-        "client_id": '3MVG9JJwBBbcN47KLGCtmf5EfwpnUfvH2qTTHN2WzOLoC1x7xwZXSy2S4gfwbi4Dw9q49YmI5qpIJl7lWBK5L',
-        "client_secret": '49090F461022CC079D0D1AB44379F39C1FB815881A4146FA4DFE482E376F55CC',
-        "username": SF_USERNAME,
-        "password": SF_PASSWORD   # Password + Security token concatenated (no spaces)
-    }
-    response = requests.post(token_url, data=params)
-    data = response.json()
-    print("Salesforce OAuth response:", data)  # Debug log
-    return data["access_token"], data["instance_url"]
+@app.route('/opportunities')
+def serve_opportunities():
+    # Example: Static data sample. Replace with actual database or Salesforce fetch logic.
+    records = [
+        {
+            "Id": "0061",
+            "Name": "Dickenson Mobile Generators",
+            "Amount": 15000.0,
+            "CloseDate": "2024-11-16",
+            "StageName": "Qualification"
+        },
+        {
+            "Id": "0062",
+            "Name": "United Oil Office Portable Generators",
+            "Amount": 125000.0,
+            "CloseDate": "2024-11-04",
+            "StageName": "Negotiation/Review"
+        }
+        # ... more records
+    ]
+    # Add AI summary for each record
+    for op in records:
+        op['summary'] = get_ai_summary(op)
+    return jsonify({"records": records, "totalSize": len(records)})
 
-@app.route('/opportunities', methods=['GET'])
-def get_opportunities():
-    access_token, instance_url = get_salesforce_token()
-    min_amount = request.args.get('min_amount', 0)
-    
-    soql = f"SELECT Id, Name, Amount, CloseDate, StageName FROM Opportunity WHERE Amount > {min_amount} AND IsClosed = False"
-    
-    headers = {"Authorization": f"Bearer {access_token}"}
-    url = f"{instance_url}/services/data/v54.0/query"
-    params = {"q": soql}
-    
-    resp = requests.get(url, headers=headers, params=params)
-    return jsonify(resp.json())
+@app.route('/ai-summary', methods=['POST'])
+def ai_summary():
+    user_question = request.json.get('query')
+    response = openai.Completion.create(
+        engine="text-davinci-003",
+        prompt=user_question,
+        max_tokens=48
+    )
+    return jsonify({"summary": response.choices[0].text.strip()})
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(debug=True)
