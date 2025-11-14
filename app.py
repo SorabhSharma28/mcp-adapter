@@ -4,7 +4,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 # Load environment variables (e.g., for API key)
-openai.api_key = os.getenv("OPENAI_API_KEY")
+openai.api_key = os.getenv("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")
 
 app = Flask(__name__)
 CORS(app)
